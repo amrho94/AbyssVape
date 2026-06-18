@@ -1,4 +1,3 @@
---This watermark is used to delete the file if its cached, remove it to make the file persist after commits.
 -- Abyss fastload patched 6872274481
 
 --[[                                                             
@@ -194,6 +193,65 @@ local function warningNotification(title, text, delay)
 	end)
 	return (suc and res)
 end
+
+local abyssPlus = {
+	enabled = false,
+	loaded = false,
+	announced = false,
+	rank = 'Abyss Plus',
+	url = 'https://amrho94.github.io/whitelist.json'
+}
+
+local function announceAbyssPlus(rank)
+	if abyssPlus.announced then return end
+	abyssPlus.announced = true
+	local message = 'You are whitelisted! Rank: '..rank
+	local shown = pcall(function()
+		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			local channels = textChatService:WaitForChild('TextChannels', 5)
+			local general = channels and (channels:FindFirstChild('RBXGeneral') or channels:FindFirstChildWhichIsA('TextChannel'))
+			assert(general, 'No text channel')
+			general:DisplaySystemMessage('<font color="#9D5EFF">[Abyss]</font> '..message)
+		else
+			game:GetService('StarterGui'):SetCore('ChatMakeSystemMessage', {
+				Text = '[Abyss] '..message,
+				Color = Color3.fromRGB(157, 94, 255),
+				Font = Enum.Font.SourceSansBold,
+				TextSize = 18
+			})
+		end
+	end)
+	if not shown then
+		warningNotification('Abyss Plus', message, 7)
+	end
+end
+
+local function refreshAbyssPlus()
+	local success = pcall(function()
+		local response = game:HttpGet(abyssPlus.url..'?cache='..tostring(os.time()), true)
+		local data = game:GetService('HttpService'):JSONDecode(response)
+		local entry = type(data) == 'table'
+			and type(data.PremiumUsers) == 'table'
+			and data.PremiumUsers[tostring(lplr.UserId)] or nil
+		abyssPlus.enabled = entry ~= nil
+		abyssPlus.loaded = true
+		if abyssPlus.enabled then
+			abyssPlus.rank = entry.rank
+				or (entry.tags and entry.tags[1] and entry.tags[1].text)
+				or entry.label
+				or 'Abyss Plus'
+			announceAbyssPlus(abyssPlus.rank)
+		end
+	end)
+	return success and abyssPlus.enabled
+end
+
+local function isAbyssPlus()
+	return abyssPlus.enabled or refreshAbyssPlus()
+end
+
+shared.AbyssPlus = abyssPlus
+task.spawn(refreshAbyssPlus)
 
 
 local function errorNotification(title, text, delay)
@@ -5556,10 +5614,20 @@ run(function()
 	GameFixer = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
 		Name = "GameFixer",
 		Function = function(callback)
+			if callback and not isAbyssPlus() then
+				warningNotification("Abyss Plus", "GameFixer requires Abyss Plus.", 5)
+				task.defer(function()
+					if GameFixer.Enabled then GameFixer.ToggleButton(false) end
+				end)
+				return
+			end
 			debug.setconstant(bedwars.SwordController.swingSwordAtMouse, 23, callback and 'raycast' or 'Raycast')
 			debug.setupvalue(bedwars.SwordController.swingSwordAtMouse, 4, callback and bedwars.QueryUtil or workspace)
 		end,
-		HoverText = "Fixes game bugs"
+		HoverText = "Fixes game bugs (Abyss Plus)",
+		ExtraText = function()
+			return "Plus"
+		end
 	})
 end)
 
@@ -9342,7 +9410,7 @@ run(function()
 				end))
 
 				table.insert(overlayconnections, vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
-					if bedTable.player.UserId == lplr.UserId then
+					if bedTable and bedTable.player and bedTable.player.UserId == lplr.UserId then
 						store.statistics.beds = store.statistics.beds + 1
 					end
 				end))
@@ -12065,8 +12133,15 @@ run(function()
 	
 	antihit = blatant.Api.CreateOptionsButton({
 		Name = 'AntiHit',
-		HoverText = 'Makes it harder for your opponent to hit you.',
+		HoverText = 'Makes it harder for your opponent to hit you. (Abyss Plus)',
 		Function = function(calling)
+			if calling and not isAbyssPlus() then
+				warningNotification('Abyss Plus', 'AntiHit requires Abyss Plus.', 5)
+				task.defer(function()
+					if antihit.Enabled then antihit.ToggleButton(false) end
+				end)
+				return
+			end
 			if calling then 
 				createClone()
 				table.insert(antihit.Connections, lplr.CharacterAdded:Connect(createClone))
@@ -12099,6 +12174,9 @@ run(function()
 			else 
 				pcall(destructClone)
 			end
+		end,
+		ExtraText = function()
+			return 'Plus'
 		end
 	})
 	
@@ -12112,7 +12190,7 @@ run(function()
 		end
 	})
 end)
-run(function()
+--[[run(function()
     -- ====== Define missing constants and helpers ======
     local AnticheatBypassNumbers = {
         TPCheck = 3,       -- teleport distance threshold
@@ -12642,3 +12720,7 @@ run(function()
     -- Make sure the module is globally accessible if needed
     getgenv().AnticheatBypass = AnticheatBypass
 end)
+]]
+
+warningNotification("AbyssVape", "made with love by 0x3F#0001 and MicrowaveOverflow.cpp#7030", 4)
+warningNotification("AbyssVape", "reborn by ~? hi-c", 6)
