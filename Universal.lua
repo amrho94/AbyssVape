@@ -1,5 +1,4 @@
 --This watermark is used to delete the file if its cached, remove it to make the file persist after commits.
---This watermark is used to delete the file if its cached, remove it to make the file persist after commits.
 local GuiLibrary = shared.GuiLibrary
 local function GetEnumItems(EnumType)
 	local items = {}
@@ -146,10 +145,28 @@ local function getPlayerColor(plr)
 end
 
 local whitelist = {data = {WhitelistedUsers = {}}, hashes = {}, said = {}, alreadychecked = {}, customtags = {}, loaded = false, localprio = 0, hooked = false, get = function() return 0, true end}
-local entityLibrary = loadstring(vapeGithubRequest("Libraries/entityHandler.lua"))()
+local entityLibrary = shared.vapeentity
+
+if not entityLibrary then
+	local ok, result = pcall(function()
+		return loadstring(vapeGithubRequest("Libraries/entityHandler.lua"))()
+	end)
+
+	if ok and type(result) == "table" then
+		entityLibrary = result
+	end
+end
+
+if not entityLibrary then
+	warningNotification("Universal", "entityHandler failed to load.", 8)
+	return
+end
+
 shared.vapeentity = entityLibrary
 do
-	entityLibrary.selfDestruct()
+	if entityLibrary.selfDestruct then
+		pcall(entityLibrary.selfDestruct)
+	end
 	table.insert(vapeConnections, GuiLibrary.ObjectsThatCanBeSaved.FriendsListTextCircleList.Api.FriendRefresh.Event:Connect(function()
 		entityLibrary.fullEntityRefresh()
 	end))
