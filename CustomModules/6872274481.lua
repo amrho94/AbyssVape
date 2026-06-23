@@ -1,3 +1,5 @@
+--This watermark is used to delete the file if its cached, remove it to make the file persist after commits.
+-- Abyss fastload patched 6872274481
 --This watermark is used to delete the file if its cached, remove it to make the file persist after commits.                     
 local GuiLibrary = shared.GuiLibrary
 local bl = loadfile("vape/Libraries/blacklist.lua")()
@@ -11598,10 +11600,13 @@ run(function()
     })
 
     visualrootcolor = Invisibility.CreateColorSlider({
-        Name = 'Root Color',
-        Default = {Hue = 0, Sat = 0, Value = 1},
-        Function = function() end
-    })
+    Name = 'Root Color',
+    Function = function() end
+})
+
+visualrootcolor.Hue = 0
+visualrootcolor.Sat = 0
+visualrootcolor.Value = 1
 
     visualrootcolor.Object.Visible = false
 end)
@@ -12180,7 +12185,101 @@ run(function()
 		end
 	})
 end)
+local skidDetected = {}
 
+run(function()
+	local SkidDetector = {Enabled = false, Connections = {}}
+
+	local skidWords = {
+		"voidware",
+		"catvape",
+		"ware",
+		"aero",
+		"void",
+		"cat",
+		"client",
+		"privet",
+		"privete",
+		"pistonware",
+		"themagicpiston"
+	}
+
+	local function isSkidMessage(msg)
+		msg = tostring(msg or ""):lower()
+
+		for _, word in ipairs(skidWords) do
+			if msg:find(tostring(word):lower(), 1, true) then
+				return true, word
+			end
+		end
+
+		return false
+	end
+
+	local function flagPlayer(plr, msg)
+		if not plr or skidDetected[plr.Name] then return end
+
+		local found = isSkidMessage(msg)
+		if found then
+			skidDetected[plr.Name] = true
+			warningNotification(
+				"SkidDetector",
+				plr.Name .. " is a likely skid!",
+				100
+			)
+		end
+	end
+
+	local function hookPlayer(plr)
+		if not plr then return end
+
+		table.insert(SkidDetector.Connections, plr.Chatted:Connect(function(msg)
+			if SkidDetector.Enabled then
+				flagPlayer(plr, msg)
+			end
+		end))
+	end
+
+	SkidDetector = blatant.Api.CreateOptionsButton({
+		Name = "SkidDetector",
+		Function = function(callback)
+			if callback then
+				repeat task.wait() until game:IsLoaded()
+
+				table.clear(skidDetected)
+
+				for _, plr in ipairs(playersService:GetPlayers()) do
+					hookPlayer(plr)
+				end
+
+				table.insert(SkidDetector.Connections, playersService.PlayerAdded:Connect(function(plr)
+					hookPlayer(plr)
+				end))
+
+				if textChatService and textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+					table.insert(SkidDetector.Connections, textChatService.MessageReceived:Connect(function(message)
+						if not SkidDetector.Enabled then return end
+						if not message.TextSource then return end
+
+						local plr = playersService:GetPlayerByUserId(message.TextSource.UserId)
+						if plr then
+							flagPlayer(plr, message.Text)
+						end
+					end))
+				end
+			else
+				for _, connection in ipairs(SkidDetector.Connections) do
+					pcall(function()
+						connection:Disconnect()
+					end)
+				end
+
+				table.clear(SkidDetector.Connections)
+			end
+		end,
+		HoverText = "Detects players saying common client/skid names in chat."
+	})
+end)
 
 warningNotification("AbyssVape", "made with love by 0x3F#0001 and MicrowaveOverflow.cpp#7030", 4)
 warningNotification("AbyssVape", "reborn by ~? hi-c", 6)
